@@ -4,3 +4,6 @@ output/*
 
 # ignore venv
 .venv
+
+# ignore vscode
+.vscode

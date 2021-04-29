@@ -42,7 +42,6 @@ def portfolio():
 
     # symbol list for CMC. remove known unsupported values for now
     unsupported_tokens = [
-        "Cake-LP",
         "mooAutoCAKE-BNB",
         "mooCakeSmart",
         "mooSwampyCAKE-BNB",
@@ -63,7 +62,8 @@ def portfolio():
     ]
     symbol_list = list(wallet_df.tokenSymbol.unique())
     for token in unsupported_tokens:
-        symbol_list.remove(token)
+        if token in symbol_list:
+            symbol_list.remove(token)
 
     # start token balances at zero
     wallet_df["api_balance"] = 0
