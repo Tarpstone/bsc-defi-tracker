@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "bsc-defi-tracker"
+version = "0.1.0"
+description = "Visualize your Binance Smart Chain DeFi portfolio across multiple wallets."
+authors = ["Mike Tarpey <mike@tarpey.dev>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+bscscan-python = "^1.0.0"
+pandas = "^1.2.4"
+httpx = "^0.18.0"
+
+[tool.poetry.dev-dependencies]
+black = "^21.4b1"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

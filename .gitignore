@@ -1,0 +1,6 @@
+# ignore contents of data and output folders
+data/*
+output/*
+
+# ignore venv
+.venv
