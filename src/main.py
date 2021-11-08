@@ -1,11 +1,115 @@
-import csv
+from typing import Dict
 from time import sleep
 from bscscan import BscScan
 import pandas as pd
 import httpx
+from datetime import datetime
 
 
-API_SLEEP_TIMER = 0.5
+API_SLEEP_TIMER = 3
+
+
+def yield_watch_tracker():
+    # read wallet info
+    wallet_dict = read_wallets_from_csv("data/address_table.csv")
+
+    # set up an empty dict to store query results
+    data_dict = {}
+    for wallet, data in wallet_dict.items():
+        data_dict[wallet] = query_yield_watch(
+            wallet_address=data.get("address"),
+            platform=",".join(data.get("platform_list")),
+        )
+
+    # extract USD info from each wallet (deposit, yield, and wallet balance)
+    money_dict = {}
+    for wallet, data in data_dict.items():
+        money_dict[wallet] = extract_usd_info(data_dict=data)
+
+    # convert to pandas dictionary
+    wallet_df = pd.DataFrame(money_dict).transpose()
+    wallet_df["full_balance"] = wallet_df["usd_total"] + wallet_df["usd_wallet_balance"]
+
+    # write query results to each data file
+    for row in wallet_df.itertuples():
+        write_yield_watch_to_file(
+            filename=row.Index,
+            net_worth=row.full_balance,
+            usd_yield=row.usd_yield,
+            wallet_balance=row.usd_wallet_balance,
+        )
+    print(wallet_df)
+
+
+def read_wallets_from_csv(wallet_path: str):
+    wallet_dict = {}
+    with open(wallet_path) as w:
+        for line in w.readlines():
+            next_wallet = line.strip().split(",")
+            # dictionary has CSV filename as key, info as dictionary values
+            wallet_dict[next_wallet[0]] = {
+                "address": next_wallet[1],
+                "platform_list": next_wallet[2:],
+            }
+
+    return wallet_dict
+
+
+def query_yield_watch(wallet_address: str, platform: str):
+    wallet_data = {}
+    r = httpx.get(
+        f"https://www.yieldwatch.net/api/all/{wallet_address}?platforms={platform}",
+        timeout=30,
+    )
+    sleep(API_SLEEP_TIMER)
+    # throw out records for platforms with no data
+    # (i.e. if there's no data for PancakeSwap because you don't use that platform)
+    cleaned_result = {k: v for k, v in r.json().get("result").items() if v}
+    for data, value in cleaned_result.items():
+        if data in ["watchBalance", "currencies"]:
+            pass
+        elif data in ["walletBalance"]:
+            wallet_data["wallet_balance"] = value
+        else:
+            wallet_data[data] = value
+    return wallet_data
+
+
+def extract_usd_info(data_dict: Dict, money_dict: Dict = None):
+    # create a money dict if it doesn't exist (top level call)
+    if not money_dict:
+        money_dict = {
+            "usd_deposit": 0,
+            "usd_yield": 0,
+            "usd_total": 0,
+            "usd_wallet_balance": 0,
+        }
+    for key, value in data_dict.items():
+        if key == "deposit":
+            money_dict["usd_deposit"] += value
+        elif key == "yield":
+            money_dict["usd_yield"] += value
+        elif key == "total":
+            money_dict["usd_total"] += value
+        elif key == "wallet_balance":
+            money_dict["usd_wallet_balance"] += value.get("totalUSDValue")
+        # if there's a key that isn't 'deposit' or 'yield',
+        # it must be nested data, so we call this function recursively.
+        elif isinstance(value, dict):
+            money_dict = extract_usd_info(data_dict=value, money_dict=money_dict)
+
+    return money_dict
+
+
+def write_yield_watch_to_file(
+    filename: str, net_worth: float, usd_yield: float, wallet_balance: float
+):
+    current_time = datetime.now().strftime('%m-%d-%y %H:%M:%S')
+    new_line_list = [current_time, filename, str(net_worth), str(usd_yield), str(wallet_balance)]
+    with open("data/" + filename, 'a') as data:
+        data.write("\n" + ','.join(new_line_list))
+    
+    return
 
 
 def bsc_defi_tracker():
@@ -64,7 +168,8 @@ def bsc_defi_tracker():
         for row in wallet_df.itertuples():
             row_dict = row._asdict()
             farms_df.loc[
-                farms_df.lp_token_contract_address == row_dict["Index"][1], "tokenDecimal"
+                farms_df.lp_token_contract_address == row_dict["Index"][1],
+                "tokenDecimal",
             ] = row_dict["tokenDecimal"]
 
         # iterate over transaction_df and make necessary updates to wallet/farms accordingly
@@ -293,4 +398,4 @@ def json_to_pd_series(json_dict):
 
 
 if __name__ == "__main__":
-    bsc_defi_tracker()
+    yield_watch_tracker()
