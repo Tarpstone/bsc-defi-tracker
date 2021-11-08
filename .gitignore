@@ -1,9 +1,13 @@
 # ignore contents of data and output folders
 data/*
 output/*
+keys/*
 
 # ignore venv
 .venv
 
 # ignore vscode
 .vscode
+
+# ignore Mac
+.DS_Store
