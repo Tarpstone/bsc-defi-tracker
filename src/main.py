@@ -1,9 +1,10 @@
-from typing import Dict
+from typing import List, Dict
 from time import sleep
 from bscscan import BscScan
 import pandas as pd
 import httpx
 from datetime import datetime
+import plotly.express as px
 
 
 API_SLEEP_TIMER = 3
@@ -38,7 +39,21 @@ def yield_watch_tracker():
             usd_yield=row.usd_yield,
             wallet_balance=row.usd_wallet_balance,
         )
-    print(wallet_df)
+
+    # read all wallet data and process
+    data_df = read_yield_watch_from_file([
+        'data/auto_wallet.csv',
+        'data/beefy_wallet.csv',
+        'data/binance_wallet.csv',
+        'data/bunny_wallet.csv',
+        'data/pancake_wallet.csv',
+        'data/sushi_wallet.csv',
+        'data/swamp_wallet.csv',
+    ])
+
+    # create charts
+    create_charts(data_df)
+    print("Done!")
 
 
 def read_wallets_from_csv(wallet_path: str):
@@ -109,6 +124,38 @@ def write_yield_watch_to_file(
     with open("data/" + filename, 'a') as data:
         data.write("\n" + ','.join(new_line_list))
     
+    return
+
+
+def read_yield_watch_from_file(file_list: List[str]):
+    df_list = []
+    for wallet in file_list:
+        data_df = pd.read_csv(wallet)
+        # fill blanks with zeroes
+        data_df.fillna(0, inplace=True)
+        # convert dates to pandas datetime
+        data_df['Datetime'] = pd.to_datetime(data_df['Datetime'])
+        # convert dollar columns to pandas numeric
+        for column in ['Net Worth', 'Yield', 'Wallet Balance']:
+            if data_df[column].dtype != 'float64':
+                data_df[column] = pd.to_numeric(data_df[column].str.strip().str.replace('[\$,]', '', regex=True))
+        # resample to daily values
+        resampled_df = data_df.set_index('Datetime').resample('1D').bfill()
+        df_list.append(resampled_df)
+
+    # concat all data frames
+    data_df = pd.concat(df_list)
+    return data_df
+
+
+def create_charts(data_df):
+    # group results by day
+    grouped_df = data_df.groupby('Datetime').sum()
+    # print the most recent line of data
+    print(grouped_df[-1:])
+    # plot on a simple bar chart
+    fig = px.line(grouped_df, y="Net Worth")
+    fig.write_image("output/net_worth_plot.png")
     return
 
 

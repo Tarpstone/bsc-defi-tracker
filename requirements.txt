@@ -2,3 +2,5 @@ bscscan-python==2.0.0
 httpx==0.20.0
 pandas==1.3.4
 Scrapy==2.5.1
+plotly==5.3.1
+kaleido==0.2.1
